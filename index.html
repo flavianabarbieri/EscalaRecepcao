@@ -64,6 +64,10 @@
     .dia.p .codigo { color:#0756ae; background:#dceaff; }
     .dia.f .codigo { color:#08783e; background:#d8f2e3; }
     .dia.ferias .codigo { color:#a84a0c; background:#ffead1; }
+    .dia.feriado { border:3px solid #16835a; background:linear-gradient(145deg,#e7f8f0,#f5fffa); box-shadow:0 0 0 2px rgba(22,131,90,.12); }
+    .dia.feriado .numero { color:#075d34; }
+    .dia .marca-feriado { position:absolute; top:7px; right:7px; max-width:calc(100% - 35px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 6px; border-radius:6px; background:#08783e; color:#fff; font-size:.56rem; font-weight:850; }
+    .dia .ferias-equipe { position:absolute; left:7px; bottom:38px; max-width:calc(100% - 14px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#9a4d08; font-size:.64rem; font-weight:800; }
     .dia .marca-anotacao { position:absolute; left:7px; bottom:9px; color:#9a6100; font-size:1.12rem; line-height:1; }
     .dia.com-anotacao {
       border:4px solid #f0a500;
@@ -128,7 +132,7 @@
       <div class="topo-calendario"><h2 id="tituloMes"></h2><div class="navegacao"><button id="anterior" title="Mês anterior">‹</button><button id="proximo" title="Próximo mês">›</button></div></div>
       <div class="calendario" id="calendario"></div>
       <div class="observacoes" id="observacoes" hidden></div>
-      <div class="legenda"><span><b>P</b>Plantão</span><span><b>F</b>Folga</span><span><b>☀</b>Férias</span><span><b>—</b>Dia normal</span></div>
+      <div class="legenda"><span><b>P</b>Plantão</span><span><b>F</b>Folga</span><span><b>☀</b>Férias da equipe</span><span><b style="background:#08783e;color:#fff">★</b>Feriado</span><span><b>—</b>Dia normal</span></div>
     </section>
     <footer>Escala de plantão — Recepção e Recepção Imagem</footer>
   </main>
@@ -177,6 +181,41 @@
 
     function escaparHtml(valor) {
       return String(valor).replace(/[&<>"']/g, caractere => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[caractere]);
+    }
+    function dataPascoa(ano) {
+      const a=ano%19,b=Math.floor(ano/100),c=ano%100,d=Math.floor(b/4),e=b%4;
+      const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
+      const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+      const mes=Math.floor((h+l-7*m+114)/31),dia=((h+l-7*m+114)%31)+1;
+      return new Date(ano,mes-1,dia);
+    }
+    function adicionarDias(data,dias) { return new Date(data.getFullYear(),data.getMonth(),data.getDate()+dias); }
+    function feriadosDoAno(ano) {
+      const pascoa=dataPascoa(ano), lista={
+        [`${ano}-01-01`]:'Confraternização Universal', [`${ano}-04-21`]:'Tiradentes',
+        [`${ano}-05-01`]:'Dia do Trabalho', [`${ano}-09-07`]:'Independência do Brasil',
+        [`${ano}-10-12`]:'Nossa Senhora Aparecida', [`${ano}-11-02`]:'Finados',
+        [`${ano}-11-15`]:'Proclamação da República', [`${ano}-11-20`]:'Dia da Consciência Negra',
+        [`${ano}-12-10`]:'Aniversário de Londrina', [`${ano}-12-25`]:'Natal'
+      };
+      lista[isoLocal(adicionarDias(pascoa,-47))]='Carnaval';
+      lista[isoLocal(adicionarDias(pascoa,-2))]='Sexta-feira da Paixão';
+      lista[isoLocal(pascoa)]='Páscoa';
+      lista[isoLocal(adicionarDias(pascoa,60))]='Corpus Christi';
+      lista[isoLocal(adicionarDias(pascoa,68))]='Sagrado Coração de Jesus — Padroeiro de Londrina';
+      return lista;
+    }
+    const FERIADOS = {};
+    for(let ano=Number(primeira.slice(0,4));ano<=Number(ultima.slice(0,4));ano++) Object.assign(FERIADOS,feriadosDoAno(ano));
+    function feriadoEm(data) { return FERIADOS[isoLocal(data)] || ''; }
+    function estaDeFerias(cfg,data) {
+      if (!cfg?.feriasInicio || Number(cfg.feriasDias)<1) return false;
+      const [a,m,d]=cfg.feriasInicio.split('-').map(Number);
+      const inicio=new Date(a,m-1,d), fim=new Date(a,m-1,d+Number(cfg.feriasDias)-1);
+      return data>=inicio && data<=fim;
+    }
+    function pessoasDeFerias(data) {
+      return pessoasDisponiveis().filter(id=>estaDeFerias(configEquipe[id],data)).map(id=>configEquipe[id].nome||id);
     }
     function carregarAnotacao() {
       const chave = dataInput.value, texto = chave ? (anotacoesDatas[chave] || '') : '';
@@ -249,11 +288,7 @@
         if (codigo === 'P') codigo = 'F';
         else if (codigo === 'F') codigo = 'P';
       }
-      if (cfg?.feriasInicio && Number(cfg.feriasDias)>0) {
-        const [a,m,d] = cfg.feriasInicio.split('-').map(Number);
-        const inicio = new Date(a,m-1,d), fim = new Date(a,m-1,d + Number(cfg.feriasDias) - 1);
-        if (data >= inicio && data <= fim) codigo = 'FÉRIAS';
-      }
+      if (estaDeFerias(cfg,data)) codigo = 'FÉRIAS';
       return { bloco, cadastro, codigo };
     }
     function descricao(codigo) {
@@ -272,7 +307,9 @@
       const horarioDia = diaSemana===0 ? cfg?.domingo : diaSemana===6 ? cfg?.sabado : cfg?.semana;
       const horario = codigo==='F' ? 'Sem expediente' : codigo==='FÉRIAS' ? 'Período de férias' : horarioDia;
       const identificacao = `${cfg?.nome||pessoa.value}${cfg?.setor ? ` — ${cfg.setor}` : ''}`;
-      textoResultado.textContent = cadastro ? `${identificacao} • ${horario||cadastro.escala} • ${dataLonga}` : `${identificacao} • ${horario||'Horário não informado'} • ${dataLonga}`;
+      const feriasEquipe=pessoasDeFerias(data), feriado=feriadoEm(data);
+      const base = cadastro ? `${identificacao} • ${horario||cadastro.escala} • ${dataLonga}` : `${identificacao} • ${horario||'Horário não informado'} • ${dataLonga}`;
+      textoResultado.textContent = `${base}${feriado ? ` • Feriado: ${feriado}` : ''}${feriasEquipe.length ? ` • De férias: ${feriasEquipe.join(', ')}` : ''}`;
       carregarAnotacao();
     }
     function renderizar() {
@@ -283,11 +320,14 @@
       const total = new Date(mesVisivel.getFullYear(),mesVisivel.getMonth()+1,0).getDate();
       for(let d=1;d<=total;d++) {
         const dt = new Date(mesVisivel.getFullYear(),mesVisivel.getMonth(),d), info=situacao(dt), codigo=info.codigo;
-        const classe = codigo==='P'?'p':codigo==='F'?'f':codigo==='FÉRIAS'?'ferias':'';
+        const feriado=feriadoEm(dt), feriasEquipe=pessoasDeFerias(dt);
+        const classe = `${codigo==='P'?'p':codigo==='F'?'f':codigo==='FÉRIAS'?'ferias':''} ${feriado?'feriado':''}`;
         const selecionado = dataInput.value===isoLocal(dt)?'selecionado':'';
         const chaveData = isoLocal(dt), temAnotacao = Boolean(anotacoesDatas[chaveData]);
         const marca = temAnotacao ? `<span class="marca-anotacao" title="${escaparHtml(anotacoesDatas[chaveData])}">📝</span>` : '';
-        calendario.insertAdjacentHTML('beforeend',`<button class="dia ${classe} ${selecionado} ${temAnotacao ? 'com-anotacao' : ''}" data-data="${chaveData}"><span class="numero">${d}</span>${marca}<span class="codigo">${codigo||'—'}</span></button>`);
+        const marcaFeriado=feriado ? `<span class="marca-feriado" title="${escaparHtml(feriado)}">FERIADO</span>` : '';
+        const marcaFerias=feriasEquipe.length ? `<span class="ferias-equipe" title="De férias: ${escaparHtml(feriasEquipe.join(', '))}">☀ ${escaparHtml(feriasEquipe.join(', '))}</span>` : '';
+        calendario.insertAdjacentHTML('beforeend',`<button class="dia ${classe} ${selecionado} ${temAnotacao ? 'com-anotacao' : ''}" data-data="${chaveData}" title="${feriado ? escaparHtml(feriado) : ''}"><span class="numero">${d}</span>${marcaFeriado}${marca}${marcaFerias}<span class="codigo">${codigo||''}</span></button>`);
       }
       if (bloco?.observacoes.length) {
         observacoes.hidden=false;
