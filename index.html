@@ -67,6 +67,14 @@
     .dia.feriado { border:3px solid #16835a; background:linear-gradient(145deg,#e7f8f0,#f5fffa); box-shadow:0 0 0 2px rgba(22,131,90,.12); }
     .dia.feriado .numero { color:#075d34; }
     .dia .marca-feriado { position:absolute; top:7px; right:7px; max-width:calc(100% - 35px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 6px; border-radius:6px; background:#08783e; color:#fff; font-size:.56rem; font-weight:850; }
+    .dia.natal { border:3px solid #b51f2e; background:linear-gradient(145deg,#fff 0 45%,#fff1f2 45% 70%,#e8f8ef 70%); box-shadow:inset 0 0 0 2px rgba(255,255,255,.75),0 5px 15px rgba(181,31,46,.15); }
+    .dia.natal:hover { border-color:#861723; box-shadow:0 0 0 3px rgba(181,31,46,.18),0 8px 20px rgba(7,93,52,.2); }
+    .dia.natal::after { content:'❄'; position:absolute; left:8px; bottom:7px; color:#b51f2e; font-size:1rem; }
+    .dia.natal .marca-feriado { color:#fff; background:linear-gradient(90deg,#b51f2e,#08783e); }
+    .balao-aniversario { position:absolute; z-index:3; left:5px; right:5px; top:31px; padding:4px 5px; border:2px solid #e38b00; border-radius:12px; color:#783d00; background:linear-gradient(135deg,#fff2a8,#ffd9ed 52%,#dff5ff); font-size:.59rem; font-weight:900; line-height:1.15; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; box-shadow:0 3px 8px rgba(154,97,0,.18); }
+    .balao-aniversario::before { content:'🎈'; margin-right:3px; }
+    .dia.aniversario { min-height:96px; }
+    .dia.aniversario .marca-anotacao { display:none; }
     .dia .ferias-equipe { position:absolute; left:7px; bottom:38px; max-width:calc(100% - 14px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#9a4d08; font-size:.64rem; font-weight:800; }
     .dia .marca-anotacao { position:absolute; left:7px; bottom:9px; color:#9a6100; font-size:1.12rem; line-height:1; }
     .dia.com-anotacao {
@@ -89,7 +97,7 @@
     .legenda { display:flex; flex-wrap:wrap; gap:8px 15px; margin-top:18px; color:var(--cinza); font-size:.82rem; }
     .legenda span b { display:inline-grid; place-items:center; width:24px; height:24px; border-radius:7px; margin-right:5px; background:#edf1ef; color:var(--texto); }
     footer { text-align:center; color:var(--cinza); padding:22px 10px 0; font-size:.78rem; }
-    @media (max-width:700px) { .filtros,.config-grid,.ferias-grid,.anotacao-linha{grid-template-columns:1fr}.hoje,.configurar,.ferias-botao,.anotacao-linha button{width:100%}.painel{padding:15px}.calendario{gap:4px}.dia{min-height:62px;padding:6px}.semana{font-size:.66rem}.dia .codigo{right:4px;bottom:4px;height:23px;min-width:23px}.dia .marca-anotacao{left:4px;bottom:7px}.resultado{padding:15px} }
+    @media (max-width:700px) { .filtros,.config-grid,.ferias-grid,.anotacao-linha{grid-template-columns:1fr}.hoje,.configurar,.ferias-botao,.anotacao-linha button{width:100%}.painel{padding:15px}.calendario{gap:4px}.dia{min-height:62px;padding:6px}.dia.aniversario{min-height:96px}.balao-aniversario{top:29px;left:4px;right:4px}.semana{font-size:.66rem}.dia .codigo{right:4px;bottom:4px;height:23px;min-width:23px}.dia .marca-anotacao{left:4px;bottom:7px}.resultado{padding:15px} }
   </style>
 </head>
 <body>
@@ -274,7 +282,7 @@
       return pessoasDisponiveis().filter(id=>estaDeFerias(configEquipe[id],data)).map(id=>configEquipe[id].nome||id);
     }
     function carregarAnotacao() {
-      const chave = dataInput.value, texto = chave ? (anotacoesDatas[chave] || '') : '';
+      const chave = dataInput.value, texto = chave ? textoDaAnotacao(chave) : '';
       textoAnotacao.value = texto;
       textoAnotacao.disabled = !chave;
       document.querySelector('#btnSalvarAnotacao').disabled = !chave;
@@ -282,6 +290,13 @@
       if (!chave) return dataAnotacao.textContent = 'Selecione um dia no calendário para escrever uma observação.';
       const [a,m,d] = chave.split('-').map(Number);
       dataAnotacao.textContent = `Observação para ${new Date(a,m-1,d).toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}.`;
+    }
+    function chaveDiaMes(chaveData) { return String(chaveData||'').slice(5); }
+    function ehAniversario(texto) { return String(texto||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes('aniversario'); }
+    function textoDaAnotacao(chaveData) {
+      if (anotacoesDatas[chaveData]) return anotacoesDatas[chaveData];
+      const diaMes = chaveDiaMes(chaveData);
+      return Object.entries(anotacoesDatas).find(([data,texto]) => chaveDiaMes(data)===diaMes && ehAniversario(texto))?.[1] || '';
     }
 
     function pessoasDisponiveis() {
@@ -379,11 +394,12 @@
         const feriado=feriadoEm(dt), feriasEquipe=pessoasDeFerias(dt);
         const classe = `${codigo==='P'?'p':codigo==='F'?'f':codigo==='FÉRIAS'?'ferias':''} ${feriado?'feriado':''}`;
         const selecionado = dataInput.value===isoLocal(dt)?'selecionado':'';
-        const chaveData = isoLocal(dt), temAnotacao = Boolean(anotacoesDatas[chaveData]);
-        const marca = temAnotacao ? `<span class="marca-anotacao" title="${escaparHtml(anotacoesDatas[chaveData])}">📝</span>` : '';
-        const marcaFeriado=feriado ? `<span class="marca-feriado" title="${escaparHtml(feriado)}">FERIADO</span>` : '';
+        const chaveData = isoLocal(dt), textoAnotado = textoDaAnotacao(chaveData), temAnotacao = Boolean(textoAnotado), aniversario = ehAniversario(textoAnotado), natal = chaveDiaMes(chaveData)==='12-25';
+        const marca = temAnotacao && !aniversario ? `<span class="marca-anotacao" title="${escaparHtml(textoAnotado)}">📝</span>` : '';
+        const balaoAniversario = aniversario ? `<span class="balao-aniversario" title="${escaparHtml(textoAnotado)}">${escaparHtml(textoAnotado)}</span>` : '';
+        const marcaFeriado=feriado ? `<span class="marca-feriado" title="${escaparHtml(feriado)}">${natal ? '🎄 NATAL' : 'FERIADO'}</span>` : '';
         const marcaFerias=feriasEquipe.length ? `<span class="ferias-equipe" title="De férias: ${escaparHtml(feriasEquipe.join(', '))}">☀ ${escaparHtml(feriasEquipe.join(', '))}</span>` : '';
-        calendario.insertAdjacentHTML('beforeend',`<button class="dia ${classe} ${selecionado} ${temAnotacao ? 'com-anotacao' : ''}" data-data="${chaveData}" title="${feriado ? escaparHtml(feriado) : ''}"><span class="numero">${d}</span>${marcaFeriado}${marca}${marcaFerias}<span class="codigo">${codigo||''}</span></button>`);
+        calendario.insertAdjacentHTML('beforeend',`<button class="dia ${classe} ${selecionado} ${temAnotacao ? 'com-anotacao' : ''} ${natal ? 'natal' : ''} ${aniversario ? 'aniversario' : ''}" data-data="${chaveData}" title="${escaparHtml([feriado,textoAnotado].filter(Boolean).join(' • '))}"><span class="numero">${d}</span>${marcaFeriado}${balaoAniversario}${marca}${marcaFerias}<span class="codigo">${codigo||''}</span></button>`);
       }
       if (bloco?.observacoes.length) {
         observacoes.hidden=false;
@@ -461,14 +477,18 @@
     document.querySelector('#btnSalvarAnotacao').addEventListener('click',async()=>{
       if (!dataInput.value) return;
       const texto = textoAnotacao.value.trim();
+      const diaMes = chaveDiaMes(dataInput.value);
       if (texto) anotacoesDatas[dataInput.value] = texto;
       else delete anotacoesDatas[dataInput.value];
+      if (!texto || !ehAniversario(texto)) Object.keys(anotacoesDatas).forEach(data => { if (data!==dataInput.value && chaveDiaMes(data)===diaMes && ehAniversario(anotacoesDatas[data])) delete anotacoesDatas[data]; });
       localStorage.setItem(CHAVE_ANOTACOES,JSON.stringify(anotacoesDatas));
       await salvarDadosOnline();
       renderizar();
     });
     btnExcluirAnotacao.addEventListener('click',async()=>{
-      if (!dataInput.value || !anotacoesDatas[dataInput.value]) return;
+      if (!dataInput.value || !textoDaAnotacao(dataInput.value)) return;
+      const diaMes = chaveDiaMes(dataInput.value);
+      Object.keys(anotacoesDatas).forEach(data => { if (chaveDiaMes(data)===diaMes && ehAniversario(anotacoesDatas[data])) delete anotacoesDatas[data]; });
       delete anotacoesDatas[dataInput.value];
       localStorage.setItem(CHAVE_ANOTACOES,JSON.stringify(anotacoesDatas));
       await salvarDadosOnline();
