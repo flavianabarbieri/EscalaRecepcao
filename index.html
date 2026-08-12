@@ -59,7 +59,7 @@
     .dia:hover { transform:translateY(-2px); box-shadow:0 7px 18px rgba(28,72,52,.11); }
     .dia.vazio { visibility:hidden; }
     .dia.selecionado { outline:3px solid rgba(8,120,62,.25); border-color:var(--verde); }
-    .dia .numero { font-weight:750; }
+    .dia .numero { position:absolute; top:9px; left:9px; z-index:3; font-weight:750; line-height:1; }
     .dia .codigo { position:absolute; right:7px; bottom:7px; min-width:27px; height:27px; padding:0 6px; border-radius:8px; display:grid; place-items:center; font-size:.76rem; font-weight:850; background:#edf1ef; }
     .dia .codigo:empty { display:none; }
     .dia.p .codigo { color:#0756ae; background:#dceaff; }
@@ -76,7 +76,8 @@
     .balao-aniversario::before { content:'🎈'; margin-right:3px; }
     .dia.aniversario { min-height:96px; }
     .dia.aniversario .marca-anotacao { display:none; }
-    .dia .ferias-equipe { position:absolute; left:7px; bottom:38px; max-width:calc(100% - 14px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#9a4d08; font-size:.64rem; font-weight:800; }
+    .ferias-nomes { position:absolute; z-index:2; left:6px; right:6px; bottom:37px; padding:3px 5px; border-radius:6px; color:#8a430c; background:#ffead1; font-size:.58rem; font-weight:800; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .dia.tem-ferias-equipe { min-height:92px; }
     .dia .marca-anotacao { position:absolute; left:7px; bottom:9px; color:#9a6100; font-size:1.12rem; line-height:1; }
     .dia.com-anotacao {
       border:4px solid #f0a500;
@@ -98,7 +99,7 @@
     .legenda { display:flex; flex-wrap:wrap; gap:8px 15px; margin-top:18px; color:var(--cinza); font-size:.82rem; }
     .legenda span b { display:inline-grid; place-items:center; width:24px; height:24px; border-radius:7px; margin-right:5px; background:#edf1ef; color:var(--texto); }
     footer { text-align:center; color:var(--cinza); padding:22px 10px 0; font-size:.78rem; }
-    @media (max-width:700px) { .filtros,.config-grid,.ferias-grid,.anotacao-linha{grid-template-columns:1fr}.hoje,.configurar,.ferias-botao,.anotacao-linha button{width:100%}.painel{padding:15px}.calendario{gap:4px}.dia{min-height:62px;padding:6px}.dia.aniversario{min-height:96px}.balao-aniversario{top:29px;left:4px;right:4px}.semana{font-size:.66rem}.dia .codigo{right:4px;bottom:4px;height:23px;min-width:23px}.dia .marca-anotacao{left:4px;bottom:7px}.resultado{padding:15px} }
+    @media (max-width:700px) { .filtros,.config-grid,.ferias-grid,.anotacao-linha{grid-template-columns:1fr}.hoje,.configurar,.ferias-botao,.anotacao-linha button{width:100%}.painel{padding:15px}.calendario{gap:4px}.dia{min-height:72px;padding:6px}.dia.aniversario{min-height:96px}.balao-aniversario{top:29px;left:4px;right:4px}.semana{font-size:.66rem}.dia .numero{top:7px;left:7px}.dia .codigo{right:4px;bottom:4px;height:23px;min-width:23px}.dia .marca-anotacao{left:4px;bottom:7px}.ferias-nomes{left:4px;right:4px;bottom:32px}.resultado{padding:15px} }
   </style>
 </head>
 <body>
@@ -399,12 +400,13 @@
         const marca = temAnotacao && !aniversario ? `<span class="marca-anotacao" title="${escaparHtml(textoAnotado)}">📝</span>` : '';
         const balaoAniversario = aniversario ? `<span class="balao-aniversario" title="${escaparHtml(textoAnotado)}">${escaparHtml(textoAnotado)}</span>` : '';
         const marcaFeriado=feriado ? `<span class="marca-feriado" title="${escaparHtml(feriado)}">${natal ? '🎄 NATAL' : 'FERIADO'}</span>` : '';
-        const marcaFerias=feriasEquipe.length ? `<span class="ferias-equipe" title="De férias: ${escaparHtml(feriasEquipe.join(', '))}">☀ ${escaparHtml(feriasEquipe.join(', '))}</span>` : '';
-        calendario.insertAdjacentHTML('beforeend',`<button class="dia ${classe} ${selecionado} ${temAnotacao ? 'com-anotacao' : ''} ${natal ? 'natal' : ''} ${aniversario ? 'aniversario' : ''}" data-data="${chaveData}" title="${escaparHtml([feriado,textoAnotado].filter(Boolean).join(' • '))}"><span class="numero">${d}</span>${marcaFeriado}${balaoAniversario}${marca}${marcaFerias}<span class="codigo">${codigo||''}</span></button>`);
+        const marcaFerias=feriasEquipe.length ? `<span class="ferias-nomes" title="Férias: ${escaparHtml(feriasEquipe.join(', '))}">Férias: ${escaparHtml(feriasEquipe.join(', '))}</span>` : '';
+        const codigoHtml = codigo ? `<span class="codigo">${codigo}</span>` : '';
+        calendario.insertAdjacentHTML('beforeend',`<button class="dia ${classe} ${selecionado} ${temAnotacao ? 'com-anotacao' : ''} ${natal ? 'natal' : ''} ${aniversario ? 'aniversario' : ''} ${feriasEquipe.length ? 'tem-ferias-equipe' : ''}" data-data="${chaveData}" title="${escaparHtml([feriado,textoAnotado,feriasEquipe.length ? 'Férias: '+feriasEquipe.join(', ') : ''].filter(Boolean).join(' • '))}"><span class="numero">${d}</span>${marcaFeriado}${marcaFerias}${balaoAniversario}${marca}${codigoHtml}</button>`);
       }
       if (bloco?.observacoes.length) {
         observacoes.hidden=false;
-        observacoes.innerHTML='<strong>Observações do mês</strong>'+bloco.observacoes.map(o=>`<p>${o}</p>`).join('');
+        observacoes.innerHTML='<strong>Observações do mês</strong>'+bloco.observacoes.map(o=>`<p>${escaparHtml(String(o).replace(/^\s*\*\s*/, ''))}</p>`).join('');
       } else observacoes.hidden=true;
       document.querySelector('#anterior').disabled = chave<=primeira;
       document.querySelector('#proximo').disabled = chave>=ultima;
